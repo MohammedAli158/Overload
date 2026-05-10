@@ -4,21 +4,19 @@ import { useState, useEffect } from "react";
 export default function ExerciseDetailsPage() {
   const { exerciseName } = useParams();
   const [details, setDetails] = useState(null);
-  const [confirmRemove, setConfirmRemove] = useState(null); // { exerciseIndex, show }
+  const [confirmRemove, setConfirmRemove] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newExercise, setNewExercise] = useState({ name: "", weight: 0, reps: 0 });
 
-  // Load from localStorage
   useEffect(() => {
     const stored = localStorage.getItem("progressiveOverload");
-    if (stored) {
-      setDetails(JSON.parse(stored));
-    }
+    if (stored) setDetails(JSON.parse(stored));
   }, []);
 
-  // Helper to update localStorage and state
-  const updateExercise = (exerciseIdx, newExercise) => {
+  const updateExercise = (exerciseIdx, newExerciseData) => {
     const updated = { ...details };
-    updated[exerciseName][exerciseIdx] = newExercise;
+    updated[exerciseName][exerciseIdx] = newExerciseData;
     localStorage.setItem("progressiveOverload", JSON.stringify(updated));
     setDetails(updated);
   };
@@ -33,16 +31,42 @@ export default function ExerciseDetailsPage() {
     setTimeout(() => setToastMessage(null), 2000);
   };
 
-  // Compute today's target based on current reps/weight
+  const addExercise = () => {
+    if (!newExercise.name.trim()) {
+      setToastMessage("Exercise name is required");
+      setTimeout(() => setToastMessage(null), 2000);
+      return;
+    }
+    const updated = { ...details };
+    updated[exerciseName] = [
+      ...updated[exerciseName],
+      {
+        name: newExercise.name.trim(),
+        weight: Number(newExercise.weight),
+        reps: Number(newExercise.reps),
+      },
+    ];
+    localStorage.setItem("progressiveOverload", JSON.stringify(updated));
+    setDetails(updated);
+    setShowAddModal(false);
+    setNewExercise({ name: "", weight: 0, reps: 0 });
+    setToastMessage("Exercise added");
+    setTimeout(() => setToastMessage(null), 2000);
+  };
+
+  // ✅ Progressive overload with muscle‑specific increments
   const getTarget = (reps, weight) => {
+    const smallMuscles = ['biceps', 'triceps', 'shoulders', 'miscl'];
+    const isSmall = smallMuscles.includes(exerciseName.toLowerCase());
+    const increment = isSmall ? 2.5 : 5;
+
     if (reps > 15) {
-      return { reps: 10, weight: weight + 5 };
+      return { reps: 10, weight: weight + increment };
     } else {
       return { reps: reps + 1, weight: weight };
     }
   };
 
-  // Handle "Target reached" – apply progressive overload rule
   const handleTargetReached = (exerciseIdx, currentReps, currentWeight) => {
     const target = getTarget(currentReps, currentWeight);
     const updatedExercise = {
@@ -55,7 +79,6 @@ export default function ExerciseDetailsPage() {
     setTimeout(() => setToastMessage(null), 2000);
   };
 
-  // Handle manual edit of reps or weight
   const handleEdit = (exerciseIdx, field, value) => {
     const updatedExercise = {
       ...details[exerciseName][exerciseIdx],
@@ -72,7 +95,6 @@ export default function ExerciseDetailsPage() {
 
   return (
     <div className="min-h-screen bg-white text-black p-6">
-      {/* Toast notification */}
       {toastMessage && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black text-white px-4 py-2 rounded shadow-lg z-50">
           {toastMessage}
@@ -80,9 +102,15 @@ export default function ExerciseDetailsPage() {
       )}
 
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold border-b-2 border-black pb-2 mb-6">
-          {exerciseName} – Last Session
-        </h1>
+        <div className="flex justify-between items-center border-b-2 border-black pb-2 mb-6">
+          <h1 className="text-3xl font-bold">{exerciseName} – Last Session</h1>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="border border-black px-4 py-2 rounded hover:bg-black hover:text-white transition"
+          >
+            + Add Exercise
+          </button>
+        </div>
 
         {exercises.map((exercise, idx) => {
           const target = getTarget(exercise.reps, exercise.weight);
@@ -90,7 +118,6 @@ export default function ExerciseDetailsPage() {
             <div key={idx} className="border border-black rounded-md p-4 mb-6">
               <div className="font-bold text-xl mb-2">{exercise.name}</div>
 
-              {/* Editable last session */}
               <div className="flex gap-4 mb-4">
                 <label className="flex items-center gap-2">
                   <span className="font-medium">Reps:</span>
@@ -112,7 +139,6 @@ export default function ExerciseDetailsPage() {
                 </label>
               </div>
 
-              {/* Today's target suggestion */}
               <div className="bg-gray-100 p-3 rounded mb-4 border-l-4 border-black">
                 <div className="font-semibold">🎯 Today's Target:</div>
                 <div>
@@ -126,7 +152,6 @@ export default function ExerciseDetailsPage() {
                 </button>
               </div>
 
-              {/* Remove button triggers confirmation */}
               <button
                 onClick={() => setConfirmRemove(idx)}
                 className="border border-black px-3 py-1 rounded hover:bg-black hover:text-white transition"
@@ -134,7 +159,6 @@ export default function ExerciseDetailsPage() {
                 Remove exercise
               </button>
 
-              {/* Confirmation popup for this exercise */}
               {confirmRemove === idx && (
                 <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
                   <div className="bg-white border-2 border-black p-6 rounded-md shadow-lg max-w-sm w-full">
@@ -142,15 +166,15 @@ export default function ExerciseDetailsPage() {
                     <div className="flex justify-end gap-3">
                       <button
                         onClick={() => setConfirmRemove(null)}
-                        className="bg-white text-black border border-black px-4 py-2 rounded hover:bg-green-700 hover:text-white hover:border-green-700 transition"
+                        className="bg-green-500 text-black border border-black px-4 py-2 rounded hover:bg-green-700 hover:text-white hover:border-green-700 transition"
                       >
-                        NO (green)
+                        NO 
                       </button>
                       <button
                         onClick={() => removeExercise(idx)}
-                        className="bg-white text-black border border-black px-4 py-2 rounded hover:bg-red-700 hover:text-white hover:border-red-700 transition"
+                        className="bg-red-500 text-black border border-black px-4 py-2 rounded hover:bg-red-700 hover:text-white hover:border-red-700 transition"
                       >
-                        YES (red)
+                        YES 
                       </button>
                     </div>
                   </div>
@@ -160,6 +184,62 @@ export default function ExerciseDetailsPage() {
           );
         })}
       </div>
+
+      {/* Add Exercise Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+          <div className="bg-white border-2 border-black p-6 rounded-md shadow-lg max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4">Add New Exercise</h2>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block font-medium mb-1">Exercise Name</label>
+                <input
+                  type="text"
+                  value={newExercise.name}
+                  onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })}
+                  className="w-full border border-black px-3 py-2 rounded"
+                  placeholder="e.g., lateral raise"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Weight (kg)</label>
+                <input
+                  type="number"
+                  value={newExercise.weight}
+                  onChange={(e) => setNewExercise({ ...newExercise, weight: e.target.value })}
+                  className="w-full border border-black px-3 py-2 rounded"
+                  placeholder="0 for bodyweight"
+                />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Reps</label>
+                <input
+                  type="number"
+                  value={newExercise.reps}
+                  onChange={(e) => setNewExercise({ ...newExercise, reps: e.target.value })}
+                  className="w-full border border-black px-3 py-2 rounded"
+                  placeholder="e.g., 10"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="border border-black px-4 py-2 rounded hover:bg-black hover:text-white transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addExercise}
+                className="bg-black text-white px-4 py-2 rounded hover:bg-white hover:text-black border border-black transition"
+              >
+                Add Exercise
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { Outlet, useNavigate } from "react-router-dom";
 
 export default function HomePage() {
-    const exercises = ['Chest', 'Back', 'Legs', 'Shoulders', 'Biceps', 'Triceps'];
+    const exercises = ['Chest', 'Back', 'Legs', 'Shoulders', 'Biceps', 'Triceps','Miscellaneous'];
     const nav = useNavigate();
 
     return (
