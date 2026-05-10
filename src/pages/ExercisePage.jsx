@@ -9,23 +9,35 @@ export default function ExerciseDetailsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newExercise, setNewExercise] = useState({ name: "", weight: 0, reps: 0 });
 
+  // Load from localStorage
   useEffect(() => {
     const stored = localStorage.getItem("progressiveOverload");
-    if (stored) setDetails(JSON.parse(stored));
+    if (stored) {
+      setDetails(JSON.parse(stored));
+    } else {
+      // Initialize empty object if nothing in localStorage
+      setDetails({});
+    }
   }, []);
+
+  // Helper to update localStorage and state
+  const updateFullState = (newDetails) => {
+    localStorage.setItem("progressiveOverload", JSON.stringify(newDetails));
+    setDetails(newDetails);
+  };
 
   const updateExercise = (exerciseIdx, newExerciseData) => {
     const updated = { ...details };
+    if (!updated[exerciseName]) updated[exerciseName] = [];
     updated[exerciseName][exerciseIdx] = newExerciseData;
-    localStorage.setItem("progressiveOverload", JSON.stringify(updated));
-    setDetails(updated);
+    updateFullState(updated);
   };
 
   const removeExercise = (exerciseIdx) => {
     const updated = { ...details };
+    if (!updated[exerciseName]) return;
     updated[exerciseName] = updated[exerciseName].filter((_, idx) => idx !== exerciseIdx);
-    localStorage.setItem("progressiveOverload", JSON.stringify(updated));
-    setDetails(updated);
+    updateFullState(updated);
     setConfirmRemove(null);
     setToastMessage("Exercise removed");
     setTimeout(() => setToastMessage(null), 2000);
@@ -38,6 +50,7 @@ export default function ExerciseDetailsPage() {
       return;
     }
     const updated = { ...details };
+    if (!updated[exerciseName]) updated[exerciseName] = [];
     updated[exerciseName] = [
       ...updated[exerciseName],
       {
@@ -46,15 +59,14 @@ export default function ExerciseDetailsPage() {
         reps: Number(newExercise.reps),
       },
     ];
-    localStorage.setItem("progressiveOverload", JSON.stringify(updated));
-    setDetails(updated);
+    updateFullState(updated);
     setShowAddModal(false);
     setNewExercise({ name: "", weight: 0, reps: 0 });
     setToastMessage("Exercise added");
     setTimeout(() => setToastMessage(null), 2000);
   };
 
-  // ✅ Progressive overload with muscle‑specific increments
+  // Progressive overload with muscle‑specific increments
   const getTarget = (reps, weight) => {
     const smallMuscles = ['biceps', 'triceps', 'shoulders', 'miscl'];
     const isSmall = smallMuscles.includes(exerciseName.toLowerCase());
@@ -87,11 +99,13 @@ export default function ExerciseDetailsPage() {
     updateExercise(exerciseIdx, updatedExercise);
   };
 
-  if (!details || !details[exerciseName]) {
-    return <div className="p-8 text-black">Loading or no data for {exerciseName}...</div>;
+  // Still loading? (details is null)
+  if (details === null) {
+    return <div className="p-8 text-black">Loading...</div>;
   }
 
-  const exercises = details[exerciseName];
+  const exercises = details[exerciseName] || [];
+  const isEmpty = exercises.length === 0;
 
   return (
     <div className="min-h-screen bg-white text-black p-6">
@@ -112,80 +126,92 @@ export default function ExerciseDetailsPage() {
           </button>
         </div>
 
-        {exercises.map((exercise, idx) => {
-          const target = getTarget(exercise.reps, exercise.weight);
-          return (
-            <div key={idx} className="border border-black rounded-md p-4 mb-6">
-              <div className="font-bold text-xl mb-2">{exercise.name}</div>
+        {isEmpty ? (
+          <div className="text-center py-12 border border-black rounded-md bg-gray-50">
+            <p className="text-lg mb-4">No exercises yet for {exerciseName}.</p>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="bg-black text-white px-4 py-2 rounded hover:bg-white hover:text-black border border-black transition"
+            >
+              Add your first exercise
+            </button>
+          </div>
+        ) : (
+          exercises.map((exercise, idx) => {
+            const target = getTarget(exercise.reps, exercise.weight);
+            return (
+              <div key={idx} className="border border-black rounded-md p-4 mb-6">
+                <div className="font-bold text-xl mb-2">{exercise.name}</div>
 
-              <div className="flex gap-4 mb-4">
-                <label className="flex items-center gap-2">
-                  <span className="font-medium">Reps:</span>
-                  <input
-                    type="number"
-                    value={exercise.reps}
-                    onChange={(e) => handleEdit(idx, "reps", e.target.value)}
-                    className="border border-black px-2 py-1 w-20 text-center"
-                  />
-                </label>
-                <label className="flex items-center gap-2">
-                  <span className="font-medium">Weight (kg):</span>
-                  <input
-                    type="number"
-                    value={exercise.weight}
-                    onChange={(e) => handleEdit(idx, "weight", e.target.value)}
-                    className="border border-black px-2 py-1 w-24 text-center"
-                  />
-                </label>
-              </div>
-
-              <div className="bg-gray-100 p-3 rounded mb-4 border-l-4 border-black">
-                <div className="font-semibold">🎯 Today's Target:</div>
-                <div>
-                  {target.reps} reps {target.weight > 0 ? `@ ${target.weight} kg` : "(bodyweight)"}
+                <div className="flex gap-4 mb-4">
+                  <label className="flex items-center gap-2">
+                    <span className="font-medium">Reps:</span>
+                    <input
+                      type="number"
+                      value={exercise.reps}
+                      onChange={(e) => handleEdit(idx, "reps", e.target.value)}
+                      className="border border-black px-2 py-1 w-20 text-center"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <span className="font-medium">Weight (kg):</span>
+                    <input
+                      type="number"
+                      value={exercise.weight}
+                      onChange={(e) => handleEdit(idx, "weight", e.target.value)}
+                      className="border border-black px-2 py-1 w-24 text-center"
+                    />
+                  </label>
                 </div>
+
+                <div className="bg-gray-100 p-3 rounded mb-4 border-l-4 border-black">
+                  <div className="font-semibold">🎯 Today's Target:</div>
+                  <div>
+                    {target.reps} reps {target.weight > 0 ? `@ ${target.weight} kg` : "(bodyweight)"}
+                  </div>
+                  <button
+                    onClick={() => handleTargetReached(idx, exercise.reps, exercise.weight)}
+                    className="mt-2 bg-black text-white px-3 py-1 rounded hover:bg-white hover:text-black border border-black transition"
+                  >
+                    Target reached ✓
+                  </button>
+                </div>
+
                 <button
-                  onClick={() => handleTargetReached(idx, exercise.reps, exercise.weight)}
-                  className="mt-2 bg-black text-white px-3 py-1 rounded hover:bg-white hover:text-black border border-black transition"
+                  onClick={() => setConfirmRemove(idx)}
+                  className="border border-black px-3 py-1 rounded hover:bg-black hover:text-white transition"
                 >
-                  Target reached ✓
+                  Remove exercise
                 </button>
-              </div>
 
-              <button
-                onClick={() => setConfirmRemove(idx)}
-                className="border border-black px-3 py-1 rounded hover:bg-black hover:text-white transition"
-              >
-                Remove exercise
-              </button>
-
-              {confirmRemove === idx && (
-                <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                  <div className="bg-white border-2 border-black p-6 rounded-md shadow-lg max-w-sm w-full">
-                    <p className="mb-4 text-lg">Do you really wanna remove it?</p>
-                    <div className="flex justify-end gap-3">
-                      <button
-                        onClick={() => setConfirmRemove(null)}
-                        className="bg-green-500 text-black border border-black px-4 py-2 rounded hover:bg-green-700 hover:text-white hover:border-green-700 transition"
-                      >
-                        NO 
-                      </button>
-                      <button
-                        onClick={() => removeExercise(idx)}
-                        className="bg-red-500 text-black border border-black px-4 py-2 rounded hover:bg-red-700 hover:text-white hover:border-red-700 transition"
-                      >
-                        YES 
-                      </button>
+                {confirmRemove === idx && (
+                  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+                    <div className="bg-white border-2 border-black p-6 rounded-md shadow-lg max-w-sm w-full">
+                      <p className="mb-4 text-lg">Do you really wanna remove it?</p>
+                      <div className="flex justify-end gap-3">
+                        <button
+                          onClick={() => setConfirmRemove(null)}
+                          className="bg-white text-black border border-black px-4 py-2 rounded hover:bg-green-700 hover:text-white hover:border-green-700 transition"
+                        >
+                          NO (green)
+                        </button>
+                        <button
+                          onClick={() => removeExercise(idx)}
+                          className="bg-white text-black border border-black px-4 py-2 rounded hover:bg-red-700 hover:text-white hover:border-red-700 transition"
+                        >
+                          YES (red)
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
-      {/* Add Exercise Modal */}
+      {/* Add Exercise Modal (same as before) */}
       {showAddModal && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white border-2 border-black p-6 rounded-md shadow-lg max-w-md w-full">
